@@ -5,6 +5,7 @@ const { connect } = require('mongoose');
 const connectDB=require('./config/db');
 const app=express();
 const userRoutes=require('./routes/userRoutes');
+const chatRoutes=require('./routes/chatRoutes');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 dotenv.config();
 connectDB(); 
@@ -19,7 +20,7 @@ app.get('/',(req,res)=>{
 //  const singleChat=chats.find((c)=>c._id===req.params.id);
 //  res.send(singleChat);
 // })
-
+app.use('/api/chat',chatRoutes);
 app.use('/api/user',userRoutes)
 app.use(notFound);
 app.use(errorHandler);
