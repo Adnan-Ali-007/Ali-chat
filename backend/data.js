@@ -1,3 +1,4 @@
+ //dummy data to check rest api in servers
  const chats = [
    {
      isGroupChat: false,
