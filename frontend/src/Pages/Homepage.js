@@ -1,8 +1,16 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import {Box, Container,Tab,Tabs,TabList,TabPanels,TabPanel,Text} from "@chakra-ui/react"
 import Login from "../componenets/Authentication/Login"
 import Signup from "../componenets/Authentication/Signup"
+import { useHistory } from 'react-router-dom/cjs/react-router-dom.min'
 const Homepage = () => {
+  const history=useHistory();
+  useEffect(()=>{
+  const user= JSON.parse(localStorage.getItem("userInfo"));
+  if(user){
+   history.push("/chats")
+  }
+   },[history]);
   return (
   //for screen size fitting
   <Container maxW='lg' centerContent> 
