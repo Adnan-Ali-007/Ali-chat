@@ -136,7 +136,8 @@ const UpdateGroupChatModal = ({ fetchMessages, fetchAgain, setFetchAgain }) => {
         },
         config
       );
-
+      user._id===user._id?setSelectedChat():setSelectedChat(data);
+      fetchMessages();
       setSelectedChat(data);
       setFetchAgain(!fetchAgain);
       setLoading(false);
@@ -164,7 +165,7 @@ const UpdateGroupChatModal = ({ fetchMessages, fetchAgain, setFetchAgain }) => {
      });
      return;
    }
- 
+    
    try {
      setLoading(true);
      const config = {
