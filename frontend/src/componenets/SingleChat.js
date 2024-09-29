@@ -1,178 +1,221 @@
 import React, { useEffect, useState } from 'react';
-import { ChatState} from '../Context/ChatProvider';
-import { Box, Text, IconButton, Flex, Spinner, FormControl, Input, position, Toast, Tooltip, Avatar } from '@chakra-ui/react'; // Combined into a single import
+import { ChatState } from '../Context/ChatProvider';
+import { Box, Text, IconButton, Flex, Spinner, FormControl, Input, Tooltip, Avatar, useToast } from '@chakra-ui/react';
 import { ArrowBackIcon } from '@chakra-ui/icons';
-import { getSender, getSenderFull, isSameSender } from '../Config/ChatLogics';
+import { getSender, getSenderFull } from '../Config/ChatLogics';
 import ProfileModel from './miscellaneous/ProfileModel';
 import UpdateGroupChatModal from './miscellaneous/UpdateGroupChatModal';
 import axios from 'axios';
-import './styles.css'
 import ScrollableChat from './ScrollableChat';
+import io from 'socket.io-client';
+import './styles.css';
+import Lottie from 'react-lottie'
+import animationData from '../animations/typing.json'
+const ENDPOINT = 'http://localhost:5000';
+let socket, selectedChatCompare;
+
 const SingleChat = ({ fetchAgain, setFetchAgain }) => {
   const { user, selectedChat, setSelectedChat } = ChatState();
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [newMessage, setNewMessage] = useState('');
+  const [socketConnected, setSocketConnected] = useState(false);
+  const [typing, setTyping] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const [notification, setNotification] = useState([]); // Define notification state
+  const toast = useToast(); 
+
+  const defaultOptions = {
+    loop: true,
+    autoplay: true,
+    animationData: animationData,
+    rendererSettings: {
+      preserveAspectRatio: "xMidYMid slice",
+    },
+  };
+
   const fetchMessages = async () => {
-    if (!selectedChat) return;
+    if (!selectedChat) return; 
+
     try {
       setLoading(true);
+
       const config = {
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${user.token}`,
         },
       };
+
       const { data } = await axios.get(`/api/message/${selectedChat._id}`, config);
-      console.log(messages);
       setMessages(data);
       setLoading(false);
+
+      socket.emit('join chat', selectedChat._id);
     } catch (error) {
-      Toast({
-        title: "Error Occurred",
-        description: "Failed to load messages",
-        status: "error",
+      toast({
+        title: 'Error Occurred',
+        description: 'Failed to load messages.',
+        status: 'error',
         duration: 5000,
         isClosable: true,
-        position: "bottom",
+        position: 'bottom',
       });
+      setLoading(false);
     }
-  };  
-  useEffect(()=>{
-     fetchMessages();
-  },[selectedChat])
+  };
+
+  useEffect(() => {
+    socket = io(ENDPOINT);
+    socket.emit("setup", user);
+    socket.on("connected", () => setSocketConnected(true));
+    socket.on("typing", () => setIsTyping(true));
+    socket.on("stop typing", () => setIsTyping(false));
+  }, [user]);
+
+  useEffect(() => {
+    if (selectedChat) {
+      fetchMessages();
+      selectedChatCompare = selectedChat;
+    }
+  }, [selectedChat]);
+
+  useEffect(() => {
+    socket.on('message received', (newMessageReceived) => {
+      if (!selectedChatCompare || selectedChatCompare._id !== newMessageReceived.chat._id) {
+        // For notifications
+        if (!notification.includes(newMessageReceived)) {
+          setNotification([newMessageReceived, ...notification]); // Update notifications
+          setFetchAgain(!fetchAgain);
+        }
+      } else {
+        setMessages((prevMessages) => [...prevMessages, newMessageReceived]);
+      }
+    });
+
+    return () => {
+      socket.off('message received');
+    };
+  }, [selectedChatCompare, notification, fetchAgain]);
+
   const sendMessage = async (event) => {
-    if (event.key === "Enter" && newMessage) {
+    if (event.key === 'Enter' && newMessage) {
+      socket.emit('stop typing', selectedChat._id);
       try {
         const config = {
           headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
             Authorization: `Bearer ${user.token}`,
           },
         };
-  
-        // Log the data being sent
-        console.log("Sending message:", newMessage, "to chat:", selectedChat._id);
-        
         const { data } = await axios.post('/api/message', {
           content: newMessage,
           chatId: selectedChat._id,
         }, config);
-  
-        console.log("Message sent successfully:", data);
-        setNewMessage(""); // Clear the input after sending message
-        setMessages([...messages, data]); // Update messages state with new message
-  
+
+        socket.emit('new message', data);
+        setMessages([...messages, data]);
+        setNewMessage('');
       } catch (error) {
-        // Log full error details, including response
-        console.error("Error response from server:", error.response.data);
-        Toast({
-          title: "Error Occurred",
-          description: "Failed to send the message",
-          status: "error",
+        toast({
+          title: 'Error Occurred',
+          description: 'Failed to send the message.',
+          status: 'error',
           duration: 5000,
           isClosable: true,
-          position: "bottom",
+          position: 'bottom',
         });
       }
     }
   };
+
   const typingHandler = (e) => {
-    setNewMessage(e.target.value)
+    setNewMessage(e.target.value);
+    if (!socketConnected) return;
+    if (!typing) {
+      setTyping(true);
+      socket.emit("typing", selectedChat._id);
+    }
+    let LastTypingTime = new Date().getTime();
+    var timerLength = 3000;
+    setTimeout(() => {
+      var timeNow = new Date().getTime();
+      var timeDiff = timeNow - LastTypingTime;
+      if (timeDiff >= timerLength && typing) {
+        socket.emit("stop typing", selectedChat._id);
+        setTyping(false);
+      }
+    }, timerLength);
   };
-  const [messages, setMessages] = useState([]);
-  const [loading, setLoading] = useState(false); // Simulate loading for testing spinner
-  const [newMessage, setNewMessage] = useState();
 
   return (
     <>
       {selectedChat ? (
-        <>
+        <Flex direction="column" w="100%" h="100%" justifyContent="space-between">
           <Flex
-            direction="column"
+            fontSize={{ base: '28px', md: '30px' }}
+            pb={3}
+            px={2}
             w="100%"
-            h="100%"
+            fontFamily="Work sans"
             justifyContent="space-between"
+            alignItems="center"
+            borderBottom="1px solid lightgray"
           >
-            <Flex
-              fontSize={{ base: '28px', md: '30px' }}
-              pb={3}
-              px={2}
-              w="100%"
-              fontFamily="Work sans"
-              justifyContent="space-between"
-              alignItems="center"
-              borderBottom="1px solid lightgray"
-            >
-              <IconButton
-                display={{ base: 'flex', md: 'none' }}
-                icon={<ArrowBackIcon />}
-                onClick={() => setSelectedChat('')}
-              />
-
-              {!selectedChat.isGroupChat ? (
-                <>
-                  {/* Display the sender's name */}
-                  <Text>{getSender(user, selectedChat.users)}</Text>
-
-                  {/* Align the eye icon (ProfileModel) to the far right */}
-                  <Box ml="auto">
-                    <ProfileModel user={getSenderFull(user, selectedChat.users)} />
-                  </Box>
-                </>
-              ) : (
-                <>
-                  {/* Display the group chat name */}
-                  <Text>{selectedChat.chatName.toUpperCase()}</Text>
-                  <UpdateGroupChatModal
-                    fetchAgain={fetchAgain}
-                    setFetchAgain={setFetchAgain}
-                    fetchMessages={fetchMessages}
-                  />
-                </>
-              )}
-            </Flex>
-
-            {/* Chat messages container */}
-            <Box
-              flex="1"
-              bg="gray.100"
-              p={3}
-              overflowY="auto"
-              display="flex"
-              flexDirection="column"
-              justifyContent="flex-end"
-            >
-              {/* Messages would go here */}
-              {loading ? (
-                <Spinner
-                  size="xl"
-                  w={20}
-                  h={20}
-                  alignSelf="center"
-                  margin="auto"
+            <IconButton
+              display={{ base: 'flex', md: 'none' }}
+              icon={<ArrowBackIcon />}
+              onClick={() => setSelectedChat('')}
+            />
+            {!selectedChat.isGroupChat ? (
+              <>
+                <Text>{getSender(user, selectedChat.users)}</Text>
+                <Box ml="auto">
+                  <ProfileModel user={getSenderFull(user, selectedChat.users)} />
+                </Box>
+              </>
+            ) : (
+              <>
+                <Text>{selectedChat.chatName.toUpperCase()}</Text>
+                <UpdateGroupChatModal
+                  fetchAgain={fetchAgain}
+                  setFetchAgain={setFetchAgain}
+                  fetchMessages={fetchMessages}
                 />
-              ) : (
-                <div className='messages'>
-                 <ScrollableChat messages={messages}/>
-                </div>
-              )}
-              <FormControl onKeyDown={sendMessage} isRequired mt={3}>
-                <Input
-                  variant="filled"
-                  bg="#E0E0E0"
-                  placeholder="Enter a message.."
-                  onChange={typingHandler}
-                  value={newMessage}
-                />
-              </FormControl>
-            </Box>
-
-            {/* Spinner at the bottom left */}
-            {loading && (
-              <Box position="absolute" bottom={3} left={3}>
-                <Spinner size="md" />
-              </Box>
+              </>
             )}
           </Flex>
-        </>
+          <Box
+            flex="1"
+            bg="gray.100"
+            p={3}
+            overflowY="auto"
+            display="flex"
+            flexDirection="column"
+            justifyContent="flex-end"
+          >
+            {loading ? (
+              <Spinner size="xl" w={20} h={20} alignSelf="center" margin="auto" />
+            ) : (
+              <ScrollableChat messages={messages} />
+            )}
+            <FormControl onKeyDown={sendMessage} isRequired mt={3}>
+              {isTyping ? (
+                <div>
+                  <Lottie options={defaultOptions} width={70} style={{ marginBottom: 15, marginLeft: 0 }} />
+                </div>
+              ) : (
+                <></>
+              )}
+              <Input
+                variant="filled"
+                bg="#E0E0E0"
+                placeholder="Enter a message.."
+                onChange={typingHandler}
+                value={newMessage}
+              />
+            </FormControl>
+          </Box>
+        </Flex>
       ) : (
         <Box display="flex" alignItems="center" justifyContent="center" height="100%">
           <Text fontSize="3xl" pb={3} fontFamily="Work sans">
