@@ -18,7 +18,6 @@ import { ChatState } from '../../Context/ChatProvider';
 import axios from 'axios';
 import UserListItem from '../UserAvatar/UserListItem';
 import UserBadgeItem from "../UserAvatar/UserBadgeItem";
-
 const GroupChatModal = ({ children }) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [groupChatName, setGroupChatName] = useState("");
@@ -28,7 +27,6 @@ const GroupChatModal = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const toast = useToast();
   const { user, chats, setChats } = ChatState();
-
   const handleSearch = async (query) => {
     setSearch(query);
     if (!query) {
@@ -42,6 +40,7 @@ const GroupChatModal = ({ children }) => {
         },
       };
       const { data } = await axios.get(`/api/user?search=${search}`, config);
+      console.log(data)
       setLoading(false);
       setSearchResult(data); // Store results
     } catch (error) {

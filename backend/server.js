@@ -8,12 +8,10 @@ const userRoutes=require('./routes/userRoutes');
 const chatRoutes=require('./routes/chatRoutes');
 const messageRoutes=require('./routes/messageRoutes')
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
+const path=require('path');
 dotenv.config();
 connectDB(); 
 app.use(express.json()); //telling server to accept json data
-app.get('/',(req,res)=>{
-    res.send('Server is ready');
-})
 // app.get('/api/chat',(req,res)=>{ testing the api
 //    res.send(chats)
 // })
@@ -24,6 +22,23 @@ app.get('/',(req,res)=>{
 app.use('/api/chat',chatRoutes);
 app.use('/api/user',userRoutes);
 app.use("/api/message",messageRoutes);
+//---deployment is here---//
+const __dirname1=path.resolve();
+console.log(process.env.NODE_ENV);
+if(process.env.NODE_ENV==='production')
+{
+app.use(express.static(path.join(__dirname1,"/frontend/build")));
+app.get('*',(req,res)=>{
+  res.sendFile(path.resolve(__dirname1,"frontend","build","index.html"));
+ 
+})
+}
+else{
+  app.get('/',(req,res)=>{
+    res.send('Server is ready.');
+})
+}
+//---deployment is here---//
 app.use(notFound);
 app.use(errorHandler);
 const PORT=process.env.PORT || 5000;
