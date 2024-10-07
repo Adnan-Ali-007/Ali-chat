@@ -67,8 +67,9 @@ io.on("connection", (socket) => {
     });
   });
 
-  socket.off('disconnect', () => {
-    console.log("User disconnected from socket.io");
+  socket.off("setup", () => {
+    console.log("USER DISCONNECTED");
+    socket.leave(userData._id);
   });
 });
 //for commit changes
