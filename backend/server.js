@@ -31,7 +31,6 @@ if (process.env.NODE_ENV === 'production') {
 // Error handling middlewares
 app.use(notFound);
 app.use(errorHandler);
-
 // Socket.io setup
 const PORT = process.env.PORT || 5000;
 const server = app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
@@ -42,7 +41,6 @@ const io = require('socket.io')(server, {
     origin: "http://localhost:3000",
   },
 });
-
 io.on("connection", (socket) => {
   console.log("Connected to socket.io");
 
@@ -69,7 +67,7 @@ io.on("connection", (socket) => {
     });
   });
 
-  socket.on('disconnect', () => {
+  socket.off('disconnect', () => {
     console.log("User disconnected from socket.io");
   });
 });
